@@ -1,62 +1,5 @@
 apply plugin: 'com.android.application'
 
-
-def javaVersion = JavaVersion.VERSION_1_7
-android {
-    compileSdkVersion 28
-    defaultConfig {
-        applicationId "com.tinker.my"
-        minSdkVersion 15
-        targetSdkVersion 28
-        versionCode 1
-        versionName "1.0"
-        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
-
-        multiDexEnabled true
-
-        compileOptions {
-            sourceCompatibility javaVersion
-            targetCompatibility javaVersion
-        }
-
-        /**
-         * buildConfig can change during patch!
-         * we can use the newly value when patch
-         */
-        buildConfigField "String", "MESSAGE", "\"I am the base apk\""
-//        buildConfigField "String", "MESSAGE", "\"I am the patch apk\""
-        /**
-         * client version would update with patch
-         * so we can get the newly git version easily!
-         */
-        buildConfigField "String", "TINKER_ID", "\"${getTinkerIdValue()}\""
-        buildConfigField "String", "PLATFORM", "\"all\""
-    }
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-    }
-    //Tinker文档中推荐将jumboMode设置为true，表示支持大工程模式
-    dexOptions {
-        jumboMode = true
-    }
-}
-
-def gitSha() {
-    try {
-        // String gitRev = 'git rev-parse --short HEAD'.execute(null, project.rootDir).text.trim()
-        String gitRev = GIT_VERSION // 注意修改这里GIT_VERSION
-        if (gitRev == null) {
-            throw new GradleException("can't get git rev, you should add git to system path or just input test value, such as 'testTinkerId'")
-        }
-        return gitRev
-    } catch (Exception e) {
-        throw new GradleException("can't get git rev, you should add git to system path or just input test value, such as 'testTinkerId'")
-    }
-}
-
 dependencies {
     //implementation fileTree(dir: 'libs', include: ['*.jar'])
     //implementation 'com.android.support:appcompat-v7:28.0.0'
@@ -97,6 +40,87 @@ dependencies {
     }
 }
 
+def gitSha() {
+    try {
+        String gitRev = 'git rev-parse --short HEAD'.execute(null, project.rootDir).text.trim()
+        //String gitRev = GIT_VERSION // 注意修改这里GIT_VERSION
+        if (gitRev == null) {
+            throw new GradleException("can't get git rev, you should add git to system path or just input test value, such as 'testTinkerId'")
+        }
+        return gitRev
+    } catch (Exception e) {
+        throw new GradleException("can't get git rev, you should add git to system path or just input test value, such as 'testTinkerId'")
+    }
+}
+
+def javaVersion = JavaVersion.VERSION_1_7
+android {
+    compileSdkVersion 28
+    buildToolsVersion '28.0.3'
+
+    compileOptions {
+        sourceCompatibility javaVersion
+        targetCompatibility javaVersion
+    }
+    //Tinker文档中推荐将jumboMode设置为true，表示支持大工程模式
+    dexOptions {
+        jumboMode = true
+    }
+/*
+    signingConfigs {
+        release {
+            try {
+                storeFile file("./keystore/release.keystore")
+                storePassword "testres"
+                keyAlias "testres"
+                keyPassword "testres"
+            } catch (ex) {
+                throw new InvalidUserDataException(ex.toString())
+            }
+        }
+
+        debug {
+            storeFile file("./keystore/debug.keystore")
+        }
+    }
+*/
+    defaultConfig {
+        applicationId "com.tinker.my"
+        minSdkVersion 15
+        targetSdkVersion 28
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+
+        multiDexEnabled true
+
+        /**
+         * buildConfig can change during patch!
+         * we can use the newly value when patch
+         */
+        buildConfigField "String", "MESSAGE", "\"I am the base apk\""
+//        buildConfigField "String", "MESSAGE", "\"I am the patch apk\""
+        /**
+         * client version would update with patch
+         * so we can get the newly git version easily!
+         */
+        buildConfigField "String", "TINKER_ID", "\"${getTinkerIdValue()}\""
+        buildConfigField "String", "PLATFORM", "\"all\""
+    }
+    buildTypes {
+        release {
+            minifyEnabled true
+            //signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            debuggable true
+            minifyEnabled false
+            //signingConfig signingConfigs.debug
+        }
+    }
+}
+
 def bakPath = file("${buildDir}/bakApk/")
 
 /**
@@ -110,14 +134,14 @@ ext {
 
     //for normal build
     //old apk file to build patch apk
-    tinkerOldApkPath = "${bakPath}/com.tinker.my.app-debug-1018-17-32-47.apk"
+    tinkerOldApkPath = "${bakPath}/old-app.apk"
     //proguard mapping file to build patch apk
-    tinkerApplyMappingPath = "${bakPath}/com.tinker.my.app-debug-1018-17-32-47-mapping.txt"
+    tinkerApplyMappingPath = "${bakPath}/app-debug-1018-17-32-47-mapping.txt"
     //resource R.txt to build patch apk, must input if there is resource changed
-    tinkerApplyResourcePath = "${bakPath}/com.tinker.my.app-debug-1018-17-32-47-R.txt"
+    tinkerApplyResourcePath = "${bakPath}/app-debug-1018-17-32-47-R.txt"
 
     //only use for build all flavor, if not, just ignore this field
-    tinkerBuildFlavorDirectory = "${bakPath}/com.tinker.my.app-1018-17-32-47"
+    tinkerBuildFlavorDirectory = "${bakPath}/app-1018-17-32-47"
 }
 
 
@@ -262,7 +286,7 @@ if (buildWithTinker()) {
              * Warning, it is very very important, loader classes can't change with patch.
              * thus, they will be removed from patch dexes.
              * you must put the following class into main dex.
-             * Simply, you should add your own application {@code tinker.sample.android.SampleApplication}
+             * Simply, you should add your own application {@code com.tinker.my.app.SampleApplication}
              * own tinkerLoader, and the classes you use in them
              *
              */
